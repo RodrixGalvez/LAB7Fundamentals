@@ -1,2 +1,0 @@
-# LAB7Fundamentals
-
