@@ -35,7 +35,7 @@ import { searchCountries, ApiError } from './services/countryApi';
 import { renderCountryList } from './components/CountryCard';
 import { openModal } from './components/CountryModal';
 import { getRequiredElement, showElement, hideElement, onDOMReady, debounce } from './utils/dom';
-import { count } from 'console';
+import { getFavorites, clearFavorites } from './utils/storage';
 
 // =============================================================================
 // ESTADO DE LA APLICACIÓN
@@ -51,6 +51,7 @@ let currentState: UiState = { status: 'idle' };
 let lastSearchQuery = '';
 let selectedRegion = 'all';
 let lastCountries: Country[] = [];
+let favoritesOnly = false;
 
 // =============================================================================
 // REFERENCIAS A ELEMENTOS DEL DOM
@@ -69,6 +70,9 @@ let errorMessage: HTMLElement;
 let emptyState: HTMLElement;
 let noResultsState: HTMLElement;
 let countriesList: HTMLElement;
+let favoriteOnlyCheckBox: HTMLInputElement;
+let clearFavoritesButton: HTMLButtonElement;
+
 
 /**
  * Inicializa las referencias a los elementos del DOM.
@@ -85,6 +89,8 @@ function initializeElements(): void {
   emptyState = getRequiredElement<HTMLElement>('#emptyState');
   noResultsState = getRequiredElement<HTMLElement>('#noResultsState');
   countriesList = getRequiredElement<HTMLElement>('#countriesList');
+  favoriteOnlyCheckBox = getRequiredElement<HTMLInputElement>('#favoritesOnly');
+  clearFavoritesButton = getRequiredElement<HTMLButtonElement>('#clearFavorites');
 }
 
 // =============================================================================
@@ -206,6 +212,7 @@ function applyRegionFilter(countries: Country[]): Country[] {
  * 5. Mostramos resultados o error
  */
 async function handleSearch(): Promise<void> {
+
   const query = searchInput.value.trim();
 
   // Si la búsqueda está vacía, volvemos al estado inicial
@@ -236,7 +243,7 @@ async function handleSearch(): Promise<void> {
     lastCountries = countries;
     populateRegionFilter(countries);
 
-    const filteredCountries = applyRegionFilter(countries);
+    const filteredCountries = applyAllFilters(countries);
 
     if (filteredCountries.length === 0) {
       render({ status: 'empty' });
@@ -324,6 +331,42 @@ function setupEventListeners(): void {
     const filtered = applyRegionFilter(lastCountries);
     render({status: 'success', data: filtered})
   })
+  
+
+  favoriteOnlyCheckBox.addEventListener('change', () => {
+  favoritesOnly = favoriteOnlyCheckBox.checked;
+
+  if (currentState.status !== 'success') return;
+
+  const filtered = applyAllFilters(lastCountries);
+  render({ status: 'success', data: filtered });
+  })
+
+  clearFavoritesButton.addEventListener('click', () => {
+  clearFavorites();
+
+  // si estás viendo favoritos, refresca la lista para que quede vacía
+  if (currentState.status === 'success') {
+    const filtered = applyAllFilters(lastCountries);
+    render({ status: 'success', data: filtered });
+  }
+  })
+
+  countriesList.addEventListener(
+  'click',
+  (event) => {
+    const target = event.target as HTMLElement;
+    if (!target.closest('.favorite-btn')) return;
+
+    // esperamos a que el handler del botón actualice localStorage
+    setTimeout(() => {
+      if (currentState.status !== 'success') return;
+      const filtered = applyAllFilters(lastCountries);
+      render({ status: 'success', data: filtered });
+    }, 0);
+  },
+  true // 👈 captura
+  );
 }
 
 /**
@@ -351,6 +394,18 @@ function initializeApp(): void {
   } catch (error) {
     console.error('Error al inicializar la aplicación:', error);
   }
+}
+function applyFavoritesFilter(countries: Country[]): Country[] {
+  if (!favoritesOnly) return countries;
+
+  const favorites = getFavorites();
+  return countries.filter((c) => favorites.includes(c.cca3));
+}
+
+function applyAllFilters(countries: Country[]): Country[] {
+  // primero región, luego favoritos (o al revés; da igual si ambos son filtros)
+  const regionFiltered = applyRegionFilter(countries);
+  return applyFavoritesFilter(regionFiltered);
 }
 
 // =============================================================================

@@ -15,6 +15,8 @@
 import type { Country } from '../types/country';
 import { formatNumber, formatCapitals } from '../utils/format';
 import { createElement } from '../utils/dom';
+import { getFavorites, toggleFavorite } from '../utils/storage';
+import { RetryHandler } from 'undici-types';
 
 /**
  * Crea una tarjeta de país para mostrar en la lista.
@@ -44,6 +46,8 @@ export function createCountryCard(
 ): HTMLElement {
   // Creamos el contenedor principal usando nuestra utilidad
   const card = createElement('article', 'country-card', 'cursor-pointer');
+  const favorite = getFavorites();
+  const isFavorite = favorite.includes(country.cca3);
 
   // Agregamos atributos de accesibilidad
   card.setAttribute('role', 'button');
@@ -69,6 +73,14 @@ export function createCountryCard(
       <span class="absolute top-3 right-3 px-3 py-1 bg-slate-900/80 text-slate-200 text-xs font-medium rounded-full backdrop-blur-sm">
         ${country.region}
       </span>
+      <button
+        class="favorite-btn absolute top-3 left-3 px-3 py-1 bg-slate-900/80 text-slate-200 text-sm font-medium rounded-full backdrop-blur-sm"
+        data-code="${country.cca3}"
+        aria-label="Marcar como favorito"
+        type="button"
+      >
+        ${isFavorite ? '❤️' : '🤍'}
+      </button>
     </div>
 
     <div class="p-5">
@@ -122,8 +134,20 @@ export function createCountryCard(
   // =========================================================================
 
   // Manejador de click
-  card.addEventListener('click', () => {
+  card.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement;
+
+    const favBtn = target.closest('.favorite-btn') as HTMLButtonElement | null;
+    if(favBtn){
+      event.stopPropagation();
+      const code = favBtn.dataset.code!;
+      const updated = toggleFavorite(code);
+      favBtn.textContent = updated.includes(code) ? '❤️' : '🤍';
+      return;
+    }
+
     onClick(country);
+
   });
 
   // Manejador de teclado para accesibilidad (Enter o Space activan la tarjeta)
