@@ -18,6 +18,7 @@ import { createElement } from '../utils/dom';
 import { getFavorites, toggleFavorite } from '../utils/storage';
 import { RetryHandler } from 'undici-types';
 
+
 /**
  * Crea una tarjeta de país para mostrar en la lista.
  *
